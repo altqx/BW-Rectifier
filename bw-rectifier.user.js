@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Bw-rectifier
-// @namespace    https://github.com/DeltaLib/Bw-rectifier
-// @version      1.0.0
+// @namespace    https://github.com/altqx/BW-Rectifier
+// @version      1.0.1
 // @description  Add "Read" button to Bookwalker's "My Books" page
 // @author       Altqx
 // @match        https://bookwalker.jp/holdBooks/*
 // @match        https://bookwalker.in.th/holdBooks/*
-// @downloadURL  https://github.com/DeltaLib/Bw-rectifier/raw/main/bw-rectifier.user.js
-// @updateURL    https://github.com/DeltaLib/Bw-rectifier/raw/main/bw-rectifier.user.js
+// @downloadURL  https://github.com/altqx/BW-Rectifier/raw/main/bw-rectifier.user.js
+// @updateURL    https://github.com/altqx/BW-Rectifier/raw/main/bw-rectifier.user.js
 // @icon         https://bookwalker.in.th/favicon.ico
 // @grant        none
 // ==/UserScript==
