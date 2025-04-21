@@ -1,157 +1,147 @@
 // ==UserScript==
 // @name         Bw-rectifier
 // @namespace    https://github.com/altqx/BW-Rectifier
-// @version      1.0.1
-// @description  Add "Read" button to Bookwalker's "My Books" page
+// @version      2.0.0
+// @description  Replace "Archive" button with "Read" button on Bookwalker.in.th's new "My Books" page
 // @author       Altqx
-// @match        https://bookwalker.jp/holdBooks/*
-// @match        https://bookwalker.in.th/holdBooks/*
+// @match        https://bookwalker.in.th/holdBooks*
 // @downloadURL  https://github.com/altqx/BW-Rectifier/raw/main/bw-rectifier.user.js
 // @updateURL    https://github.com/altqx/BW-Rectifier/raw/main/bw-rectifier.user.js
 // @icon         https://bookwalker.in.th/favicon.ico
 // @grant        none
+// @run-at       document-idle
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    function addReadButton(bookBtnList) {
-        const bookItem = bookBtnList.closest('.book-item');
-        const bookLink = bookItem.querySelector('.book-tl-txt a');
-        const isThaiSite = window.location.hostname === 'bookwalker.in.th';
-        
-        if (isThaiSite) {
-            // Always try to get the book UUID first
-            const bookUUID = bookLink.href.match(/bookwalker\.[a-z\.]+\/(?:de|)(.+?)\//)[1];
-            
-            // Check for any existing button
-            const existingBtn = bookBtnList.querySelector('.book-btn-item-full');
-            if (existingBtn) {
-                // If it's an "App only" button, replace it
-                if (existingBtn.textContent.trim() === 'กรุณาอ่านอีบุ๊กนี้ด้วยแอป BOOK☆WALKER') {
-                    existingBtn.innerHTML = `<a href="https://member.bookwalker.jp/app/03/webstore/cooperation?r=BROWSER_VIEWER/${bookUUID}/https%3A%2F%2Fbookwalker.jp%2FholdBooks%2F" target="_blank" class="btn btn-gray btn-read  btn-block book-status-viewer" data-action-label="อ่านหนังสือเล่มนี้"><i class="ico ico-book-open"></i><span class="txt"><span class="str">อ่านหนังสือเล่มนี้</span></span></a>`;
-                }
-            } else {
-                // If no button exists, create a new one
-                const newListItem = document.createElement('li');
-                newListItem.className = 'book-btn-item book-btn-item-full';
-                newListItem.innerHTML = `<a href="https://member.bookwalker.jp/app/03/webstore/cooperation?r=BROWSER_VIEWER/${bookUUID}/https%3A%2F%2Fbookwalker.jp%2FholdBooks%2F" target="_blank" class="btn btn-gray btn-read  btn-block book-status-viewer" data-action-label="อ่านหนังสือเล่มนี้"><i class="ico ico-book-open"></i><span class="txt"><span class="str">อ่านหนังสือเล่มนี้</span></span></a>`;
-                bookBtnList.appendChild(newListItem);
-            }
+    const ARCHIVE_BUTTON_TEXT = 'เก็บใส่คลัง';
+    const READ_BUTTON_TEXT = 'อ่าน';
+    const READ_BUTTON_CLASS = 'bw-read-button';
+
+    // Function to create the "Read" button element
+    function createReadButton(bookUUID) {
+        const readLink = document.createElement('a');
+        readLink.href = `https://member.bookwalker.jp/app/03/webstore/cooperation?r=BROWSER_VIEWER/${bookUUID}/https%3A%2F%2Fbookwalker.jp%2FholdBooks%2F`;
+        readLink.target = '_blank';
+        readLink.className = `border-2 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white shadow hover:bg-blue-700 px-4 py-2 rounded-full h-[38px] w-1/2 ${READ_BUTTON_CLASS}`; // Added w-1/2 to match archive button size
+        readLink.innerHTML = `<span class="text-[14px] font-normal">${READ_BUTTON_TEXT}</span>`;
+        return readLink;
+    }
+
+    function processBookItem(bookItemContainer) {
+        const archiveButton = Array.from(bookItemContainer.querySelectorAll('button')).find(
+            button => button.textContent.trim() === ARCHIVE_BUTTON_TEXT
+        );
+
+        if (!archiveButton || archiveButton.disabled) {
+             const existingReadBtn = bookItemContainer.querySelector(`.${READ_BUTTON_CLASS}`);
+             if (existingReadBtn) {
+                 return;
+             }
+             return;
+        }
+
+        const bookLinkElement = bookItemContainer.querySelector('a[href^="/product/"]');
+        if (!bookLinkElement) {
+            console.warn('Could not find book link for item:', bookItemContainer);
             return;
         }
 
-        // Japanese site logic
-        if (!bookBtnList.querySelector('.book-btn-item-full')) {
-            const bookUUID = bookLink.href.match(/bookwalker\.[a-z\.]+\/(?:de|)(.+?)\//)[1];
-            const newListItem = document.createElement('li');
-            newListItem.className = 'book-btn-item book-btn-item-full';
-            newListItem.innerHTML = `<a href="https://member.bookwalker.jp/app/03/webstore/cooperation?r=BROWSER_VIEWER/${bookUUID}/https%3A%2F%2Fbookwalker.jp%2FholdBooks%2F" target="_blank" class="btn btn-gray btn-read  btn-block book-status-viewer" data-action-label="この本を読む"><i class="ico ico-book-open"></i><span class="txt"><span class="str">この本を読む</span></span></a>`;
-            bookBtnList.appendChild(newListItem);
+        const bookLink = bookLinkElement.href;
+        const uuidMatch = bookLink.match(/\/product\/([a-f0-9-]+)/);
+        if (!uuidMatch || !uuidMatch[1]) {
+            console.warn('Could not extract UUID from link:', bookLink);
+            return;
         }
+        const bookUUID = uuidMatch[1];
+        const readButton = createReadButton(bookUUID);
+        console.log(`Replacing archive button with read button for UUID: ${bookUUID}`);
+        archiveButton.replaceWith(readButton);
     }
 
-    function waitForBookListUpdate() {
-        return new Promise((resolve) => {
-            const isThaiSite = window.location.hostname === 'bookwalker.in.th';
-            
-            const observer = new MutationObserver((mutations) => {
-                if (isThaiSite) {
-                    const bookList = document.querySelector('.md-book-list');
-                    const seriesList = document.querySelector('.md-series-list');
-                    const numberOfTotal = document.querySelector('.pagenate .numberOfTotal');
-                    
-                    if ((bookList || seriesList) && numberOfTotal && numberOfTotal.textContent !== '0') {
-                        observer.disconnect();
-                        resolve();
-                    }
-                } else {
-                    const numberOfTotal = document.querySelector('.bookTl .numberOfTotal');
-                    if (numberOfTotal && numberOfTotal.textContent !== '0') {
-                        observer.disconnect();
-                        resolve();
-                    }
-                }
-            });
-    
-            const targetElement = isThaiSite ? 
-                document.querySelector('.pagenate') : 
-                document.querySelector('.bookTl');
-    
-            if (targetElement) {
-                observer.observe(targetElement, { 
-                    subtree: true, 
-                    characterData: true,
-                    childList: true 
-                });
-            } else {
-                resolve();
+    function processAllBooks() {
+        const bookContainers = document.querySelectorAll('div.text-white.rounded-lg.w-full.flex.flex-col, div.text-white.rounded-lg.w-full.flex.sm\\:flex-row');
+
+        if(bookContainers.length === 0) {
+            const anyArchiveButton = document.querySelector(`button:not(.${READ_BUTTON_CLASS.replace('.', '')})`);
+            if (anyArchiveButton && anyArchiveButton.textContent.trim() === ARCHIVE_BUTTON_TEXT) {
+                 console.log("Using fallback");
+                 const potentialContainers = document.querySelectorAll('button');
+                 potentialContainers.forEach(button => {
+                     if (button.textContent.trim() === ARCHIVE_BUTTON_TEXT && !button.closest(`.${READ_BUTTON_CLASS}`)) {
+                         const container = button.closest('.flex.flex-col.justify-between')?.parentElement;
+                         if (container) {
+                             processBookItem(container);
+                         } else {
+                            const commonAncestor = button.closest('div:has(a[href^="/product/"])');
+                            if (commonAncestor && !commonAncestor.querySelector(`.${READ_BUTTON_CLASS}`)) {
+                                processBookItem(commonAncestor);
+                            }
+                         }
+                     }
+                 });
+                 return;
             }
-    
-            setTimeout(() => {
-                observer.disconnect();
-                resolve();
-            }, 10000);
+        }
+
+
+        bookContainers.forEach(container => {
+             if (container.querySelector('a[href^="/product/"]')) {
+                 processBookItem(container);
+             }
         });
     }
 
-    function initialize() {
-        function checkExistingButtons() {
-            const bookLists = document.querySelectorAll('.md-book-list .book-btn-list, .md-series-list .book-btn-list');
-            bookLists.forEach(addReadButton);
-        }
-
-        function setupButtonObserver() {
-            const observer = new MutationObserver((mutations) => {
-                checkExistingButtons();
-            });
-
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-                characterData: true
-            });
-
-            checkExistingButtons();
-        }
-
-        if (window.location.hostname === 'bookwalker.in.th') {
-            setupButtonObserver();
-            
-            waitForBookListUpdate().then(() => {
-                const bookList = document.querySelector('.md-book-list');
-                const seriesList = document.querySelector('.md-series-list');
-                
-                if (bookList) setupObserver(bookList);
-                if (seriesList) setupObserver(seriesList);
-            });
-        } else {
-            waitForBookListUpdate().then(() => {
-                const bookLists = document.querySelectorAll('.md-book-list .book-btn-list');
-                bookLists.forEach(addReadButton);
-                setupObserver(document.querySelector('.md-book-list'));
-            });
-        }
-    }
-
-    function setupObserver(mdBookList) {
-        if (!mdBookList) return;
-    
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const bookBtnLists = node.querySelectorAll('.book-btn-list');
-                            bookBtnLists.forEach(addReadButton);
+    // --- MutationObserver Logic ---
+    const mutationCallback = (mutationsList, observer) => {
+        let processed = false;
+        for (const mutation of mutationsList) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.matches('div.text-white.rounded-lg.w-full.flex.flex-col, div.text-white.rounded-lg.w-full.flex.sm\\:flex-row') && node.querySelector('a[href^="/product/"]')) {
+                           processBookItem(node);
+                           processed = true;
                         }
-                    });
-                }
-            });
-        });
-    
-        observer.observe(mdBookList, { childList: true, subtree: true });
-    }
+                        // Check if the node *contains* book containers (e.g., a list was added)
+                        const newContainers = node.querySelectorAll('div.text-white.rounded-lg.w-full.flex.flex-col, div.text-white.rounded-lg.w-full.flex.sm\\:flex-row');
+                        newContainers.forEach(container => {
+                           if (container.querySelector('a[href^="/product/"]')) {
+                                processBookItem(container);
+                                processed = true;
+                           }
+                        });
+                        // Check if the node contains the specific button we are looking for
+                        const newButtons = node.querySelectorAll ? node.querySelectorAll('button') : [];
+                         newButtons.forEach(button => {
+                             if (button.textContent.trim() === ARCHIVE_BUTTON_TEXT) {
+                                 const commonAncestor = button.closest('div:has(a[href^="/product/"])');
+                                 if (commonAncestor && !commonAncestor.querySelector(`.${READ_BUTTON_CLASS}`)) {
+                                     processBookItem(commonAncestor);
+                                     processed = true;
+                                 }
+                             }
+                         });
+                    }
+                });
+            } else if (mutation.type === 'attributes' && mutation.target.tagName === 'BUTTON' && mutation.target.textContent.trim() === ARCHIVE_BUTTON_TEXT) {
+                // Sometimes buttons might be added then enabled, or attributes change. Re-check.
+                 const commonAncestor = mutation.target.closest('div:has(a[href^="/product/"])');
+                 if (commonAncestor && !commonAncestor.querySelector(`.${READ_BUTTON_CLASS}`)) {
+                     processBookItem(commonAncestor);
+                     processed = true;
+                 }
+            }
+        }
+    };
 
-    initialize();
+    const observer = new MutationObserver(mutationCallback);
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['disabled', 'class']
+     });
+     processAllBooks();
 })();
